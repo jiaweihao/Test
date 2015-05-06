@@ -87,5 +87,5 @@ printf("\t\t\t输入错误，请输入1-5内的数字\n");
 printf("\t\t\t请选择(1-5):");
 scanf("%d",&type);
 goto loop;
-}
+}                               
 }
