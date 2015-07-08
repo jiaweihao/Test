@@ -1,0 +1,1045 @@
+（1）ActionProcess.java
+
+package chat; 
+
+import java.awt.event.ActionEvent;
+
+import java.io.DataInputStream;
+
+import java.io.DataOutputStream;
+
+import java.io.IOException;
+
+import java.net.*; 
+
+import javax.swing.JOptionPane; 
+
+public class ActionProcess implements Runnable {
+
+ private ChatClient client;
+
+String name=""; 
+
+String sendtoname=""; 
+
+String sendtoID;
+
+String filename="";
+
+String filepath="";
+
+public ActionProcess(ChatClient client) {
+
+this.client=client; 
+
+} 
+
+public void action(ActionEvent e)throws Exception{
+
+if(e.getSource()==client.connection)
+
+{
+
+try
+
+{
+
+if(client.socket.isConnected()){}
+
+else
+
+{
+
+String addr=JOptionPane.showInputDialog("请输入服务器IP:");
+
+InetAddress address=InetAddress.getByName(addr); 
+
+InetSocketAddress  socketAddress=new  InetSocketAddress(address,5555);
+
+client.socket.connect(socketAddress); 
+
+client.in=new DataInputStream(client.socket.getInputStream());
+
+client.out=new DataOutputStream(client.socket.getOutputStream());
+
+name=client.inputName.getText(); 
+
+client.out.writeUTF("姓名为"+name+"的朋友风尘仆仆地上线了...");
+
+client.listen.setEnabled(true);
+
+client.filesend.setEnabled(true);
+
+client.sendtoall.setEnabled(true);
+
+client.sendtoone.setEnabled(true);
+
+client.emote.setEnabled(true); 
+
+if(!(client.thread.isAlive())) 
+
+client.thread=new Thread(this);
+
+client.thread.start();
+
+}
+
+} 
+
+catch(IOException ee){} 
+
+} 
+
+if(e.getSource()==client.listen)
+
+{
+
+try
+
+{
+
+name=client.inputName.getText(); 
+
+client.out.writeUTF("姓名为"+name+"的朋友正在监听中...");
+
+filesendServer filesendserver=new filesendServer();
+
+filesendserver.filereceive(); 
+
+} 
+
+catch (Exception ee) {
+
+ee.printStackTrace();
+
+} 
+
+} 
+
+if(e.getSource()==client.filesend){
+
+if(client.socket.isConnected())
+
+try {
+
+filesendClient filesendclient=new filesendClient();
+
+filesendclient.filesend();
+
+client.out.writeUTF("成功发送文件！");
+
+}catch (Exception ee){}
+
+} 
+
+if(e.getSource()==client.exit)
+
+{
+
+if(client.socket.isConnected())
+
+try {
+
+name=client.inputName.getText();
+
+client.out.writeUTF("姓名为"+name+"的朋友黯然下线了...");
+
+client.out.flush();
+
+client.out.close();
+
+client.socket.close();
+
+} catch (IOException e1) { 
+
+e1.printStackTrace(); 
+
+} 
+
+System.exit(0); 
+
+} 
+
+String em=client.emote.getSelectedItem().toString();
+
+if (em.equals("表情")) {
+
+em = "";
+
+} else {
+
+em += "着";  
+
+} 
+
+if(e.getSource()==client.sendtoall)
+
+{ 
+
+if(client.socket.isConnected()){
+
+name=client.inputName.getText();
+
+String s=client.inputContent.getText();
+
+if(s!=null)
+
+{
+
+try
+
+{
+
+client.out.writeUTF(name+em+"对大家说："+s);
+
+client.out.flush();
+
+client.inputContent.setText(""); 
+
+} 
+
+catch(IOException e1){} 
+
+} 
+
+} 
+
+} 
+
+if(e.getSource()==client.sendtoone) 
+
+{
+
+if(client.socket.isConnected()){
+
+sendtoID=JOptionPane.showInputDialog("请输入对方ID:");
+
+sendtoname=JOptionPane.showInputDialog("请输入对方姓名:");
+
+String s=client.inputContent.getText();
+
+name=client.inputName.getText();
+
+if(s!=null)
+
+{
+
+try
+
+{
+
+client.out.writeUTF(name+" 悄 悄 地 "+em+" 对 <"+sendtoID+">"+sendtoname+"说："+s);
+
+client.out.flush();
+
+client.inputContent.setText(""); 
+
+} 
+
+catch(IOException e1){} 
+
+} 
+
+} 
+
+}  
+
+}  
+
+public void run() 
+
+{
+
+String s=null;
+
+while(true)
+
+{
+
+try
+
+{ 
+
+s=client.in.readUTF();
+
+client.chatResult.append("\n"+s); 
+
+} 
+
+catch(IOException e)
+
+{
+
+client.chatResult.setText("与服务器断开连接");
+
+try
+
+{
+
+client.socket.close();
+
+} 
+
+catch(Exception ep){}
+
+break; 
+
+} 
+
+} 
+
+} 
+
+} 
+
+（2）Clicent.java
+
+package chat;
+
+import java.awt.*;
+
+import java.io.*;
+
+import java.net.*;
+
+import java.awt.event.*;
+
+import javax.swing.*;
+
+public class Client { 
+
+public static void main(String args[])
+
+{ 
+
+new ChatClient(); 
+
+}
+
+} 
+
+class ChatClient extends Frame implements ActionListener, Runnable{ 
+
+private static final long serialVersionUID = -4149839042245330513L; 
+
+public Button listen,connection,sendtoall,sendtoone,exit,filesend;
+
+public JComboBox emote;
+
+public TextField inputName,inputContent;
+
+public TextArea chatResult;
+
+public Socket socket=null; 
+
+public DataInputStream in=null;
+
+public DataOutputStream out=null; 
+
+public Thread thread;
+
+ChatClient()
+
+{
+
+socket=new Socket(); 
+
+Box box1=Box.createHorizontalBox();
+
+listen=new Button("作为服务器监听");
+
+connection=new Button("连接服务器");
+
+filesend=new Button("发送文件");
+
+exit=new Button("退出");
+
+sendtoall=new Button("群聊");
+
+sendtoone=new Button("私聊");
+
+listen.setEnabled(false);
+
+filesend.setEnabled(false);
+
+sendtoall.setEnabled(false);
+
+sendtoone.setEnabled(false); 
+
+inputName=new TextField(6); 
+
+inputName.setBackground(new Color(162,231,250));
+
+inputContent=new TextField(22); 
+
+inputContent.setBackground(new Color(162,231,250)); 
+
+chatResult= new TextArea("", 17,20,TextArea.SCROLLBARS_VERTICAL_ONLY);
+
+chatResult.setBackground(new Color(162,231,250));
+
+JLabel jlname=new JLabel("输入昵称");
+
+box1.add(jlname);
+
+box1.add(inputName);
+
+box1.add(listen); 
+
+box1.add(connection);
+
+box1.add(filesend);
+
+box1.add(exit); 
+
+Box box2=Box.createHorizontalBox();
+
+emote = new JComboBox(); 
+
+emote.setModel(new DefaultComboBoxModel(new String[] { "表情", "微笑", "甜笑", "惊喜", "嘻嘻", "扮酷", "嘿嘿", "傻笑", "好奇", "媚眼", "鬼脸", "陶醉", "害羞", "生气", "嚷嚷", "发怒", "伤心", "高明", "菜鸟", "问号", "狂笑", "大哭", "示爱", "呻吟", "想想" })); 
+
+emote.setEnabled(false); 
+
+JLabel jlintput = new JLabel("输入聊天内容");
+
+box2.add(jlintput); 
+
+box2.add(inputContent);
+
+box2.add(emote);
+
+box2.add(sendtoall);
+
+box2.add(sendtoone); 
+
+listen.addActionListener(this);
+
+connection.addActionListener(this);
+
+filesend.addActionListener(this);
+
+exit.addActionListener(this); 
+
+sendtoall.addActionListener(this);
+
+sendtoone.addActionListener(this);
+
+Box box3=Box.createHorizontalBox();
+
+box3.add(chatResult);
+
+thread=new Thread(this); 
+
+Box box0=Box.createVerticalBox();
+
+box0.add(Box.createVerticalStrut(10));
+
+box0.add(box1); 
+
+box0.add(Box.createVerticalStrut(10));
+
+box0.add(box3); 
+
+box0.add(Box.createVerticalStrut(10));
+
+box0.add(box2); 
+
+box0.add(Box.createVerticalStrut(10)); 
+
+add(box0); 
+
+setBounds(10,30,500,400); 
+
+setBackground(new Color(80,212,248));
+
+setVisible(true);
+
+validate(); 
+
+addWindowListener(new WindowAdapter(){
+
+public void windowClosing(WindowEvent e){
+
+System.exit(0);
+
+try {
+
+socket.close();
+
+} catch (IOException e1) {
+
+e1.printStackTrace();
+
+} 
+
+} 
+
+}); 
+
+}
+
+public void actionPerformed(ActionEvent e) {
+
+ActionProcess actionProcess=new ActionProcess(this);
+
+try {
+
+actionProcess.action(e);
+
+} catch (Exception e1) { 
+
+e1.printStackTrace();
+
+} 
+
+} 
+
+ public void run()
+
+{
+
+String s=null;
+
+while(true) {
+
+try
+
+{
+
+s=in.readUTF(); 
+
+chatResult.append("\n"+s); 
+
+} 
+
+catch(IOException e)
+
+{
+
+chatResult.setText("与服务器断开连接");
+
+try
+
+{
+
+socket.close(); 
+
+}  catch(Exception ep){}
+
+break; 
+
+}
+
+}  
+
+}
+
+} 
+
+（3）ChatServer.java
+
+package chat;
+
+import java.net.*;
+
+import java.io.*;
+
+import java.util.*;
+
+public class ChatServer
+
+{
+
+public static void main(String[] args)throws Exception{ 
+
+ServerSocket svSocket =null;
+
+Vector threads = new Vector();
+
+try {
+
+svSocket = new ServerSocket(5555); 
+
+System.out.println ("listening...");
+
+}catch (Exception ex) {
+
+System.out.println ("Server create ServerSocket failed!");
+
+return; 
+
+} 
+
+try{
+
+int nid = 0;
+
+while(true){
+
+Socket socket = svSocket.accept();
+
+System.out.println ("accept a client"); 
+
+ServerThread st = new ServerThread(socket,threads);
+
+st.setID(nid++);
+
+threads.add(st); 
+
+new Thread(st).start(); 
+
+for(int i=0;i < threads.size();i++){
+
+ServerThread temp = (ServerThread)threads.elementAt(i);
+
+} 
+
+System.out.println ("Listen again..."); 
+
+} 
+
+}catch(Exception ex){
+
+System.out.println ("server is down");
+
+} 
+
+} 
+
+} 
+
+class ServerThread implements Runnable{
+
+private Vector threads;
+
+private Socket socket = null;
+
+private DataInputStream in = null;
+
+private DataOutputStream out = null; 
+
+private int nid; 
+
+public ServerThread(Socket socket,Vector threads){
+
+this.socket = socket;
+
+this.threads = threads;
+
+try {
+
+in = new DataInputStream(socket.getInputStream());
+
+out = new DataOutputStream(socket.getOutputStream()); 
+
+}
+
+catch (Exception ex) { 
+
+} 
+
+} 
+
+public void run(){
+
+System.out.println ("Thread is running");
+
+try{
+
+while(true){
+
+String receive = in.readUTF();
+
+if(receive == null)
+
+return;
+
+if(receive.contains("黯然下线了")){ 
+
+for(int i=0;i < threads.size();i++){ 
+
+ServerThread st = (ServerThread)threads.elementAt(i);
+
+st.write("***"+receive+"***");
+
+} 
+
+} 
+
+else if(receive.contains("上线了")){
+
+for(int i=0;i < threads.size();i++){
+
+ServerThread st = (ServerThread)threads.elementAt(i);
+
+st.write("<"+getID()+">: "+receive); 
+
+}
+
+} 
+
+else if(receive.contains("监听中")){
+
+for(int i=0;i < threads.size();i++){
+
+ServerThread st = (ServerThread)threads.elementAt(i);
+
+st.write("***"+receive+"*** "); 
+
+}
+
+} 
+
+else if(receive.contains("说")){ 
+
+if(receive.contains("大家")){ 
+
+for(int i=0;i < threads.size();i++){ 
+
+ServerThread st = (ServerThread)threads.elementAt(i); 
+
+st.write("<"+getID()+">: "+receive);
+
+}
+
+} 
+
+else{
+
+int temp=receive.indexOf("<");
+
+int temp1=receive.indexOf(">");
+
+String tempS=receive.substring(temp+1,temp1);
+
+int i=Integer.parseInt(tempS);
+
+ServerThread st = (ServerThread)threads.elementAt(i);
+
+st.write("<"+getID()+">: "+receive);
+
+st = (ServerThread)threads.elementAt(getID());
+
+st.write("<"+getID()+">: "+receive); 
+
+} 
+
+}
+
+else{ 
+
+ServerThread st = (ServerThread)threads.elementAt(getID()); 
+
+st.write("***"+receive+"***"); 
+
+} 
+
+} 
+
+}catch(Exception ex){ 
+
+threads.removeElement(this);
+
+ex.printStackTrace(); 
+
+}
+
+try{
+
+socket.close();
+
+}catch(Exception ex){
+
+ex.printStackTrace();
+
+} 
+
+} 
+
+public void write(String msg){
+
+synchronized(out){
+
+try{ 
+
+out.writeUTF(msg);
+
+}catch(Exception ex){
+
+} 
+
+} 
+
+} 
+
+public int getID(){
+
+return this.nid; 
+
+} 
+
+public void setID(int nid){
+
+this.nid = nid; 
+
+} 
+
+} 
+
+（4）fliesendClient.java
+
+package chat;
+
+import java.io.BufferedReader;
+
+import java.io.File; 
+
+import java.io.FileInputStream;
+
+import java.io.InputStreamReader;
+
+import java.io.OutputStream;
+
+import java.io.PrintStream;
+
+import java.net.Socket; 
+
+import javax.swing.JOptionPane;
+
+public class filesendClient {
+
+public void filesend() throws Exception{
+
+String sendtoIP=JOptionPane.showInputDialog("请输入对方IP:");
+
+Socket socket = new Socket(sendtoIP, 1234); 
+
+BufferedReader br = new BufferedReader( 
+
+new InputStreamReader(socket.getInputStream())); 
+
+PrintStream ps = new PrintStream(socket.getOutputStream()); 
+
+File file = getFile(); 
+
+ps.println(file.getName());
+
+ps.println(file.length());  
+
+String msg = br.readLine();
+
+if("已存在".equals(msg)){
+
+JOptionPane.showMessageDialog(null,"文件已存在,请不要重复上传!");
+
+return; 
+
+} 
+
+long finishLen = Long.parseLong(msg);
+
+FileInputStream fis = new FileInputStream(file);
+
+OutputStream out = socket.getOutputStream();
+
+byte[] buffer = new byte[1024]; 
+
+int len; 
+
+fis.skip(finishLen);
+
+while((len = fis.read(buffer)) != -1)
+
+out.write(buffer, 0, len);
+
+fis.close();
+
+socket.close(); 
+
+} 
+
+public File getFile() throws Exception{
+
+File file=null;
+
+boolean flag=false;
+
+while(flag==false){
+
+String filepath=JOptionPane.showInputDialog("请输入要上传的路径:");
+
+file = new File(filepath);
+
+if(!file.exists()){ 
+
+JOptionPane.showMessageDialog(null,"您输入的路径不存在,请重新输入！");
+
+flag=false; 
+
+} 
+
+else if(file.isDirectory()){ 
+
+JOptionPane.showMessageDialog(null,"占不支持文件夹上传!请输入一个 文件路径！");
+
+flag=false; 
+
+} 
+
+else flag=true; 
+
+} 
+
+return file;  
+
+} 
+
+} 
+
+（5）filesendServer.java
+
+     package chat;
+
+import java.io.BufferedReader;
+
+import java.io.File; 
+
+import java.io.FileOutputStream;
+
+import java.io.IOException;
+
+import java.io.InputStream;
+
+import java.io.InputStreamReader;
+
+import java.io.PrintStream;
+
+import java.net.ServerSocket;
+
+import java.net.Socket; 
+
+import java.text.SimpleDateFormat;
+
+import java.util.Date; 
+
+import javax.swing.JOptionPane; 
+
+public class filesendServer{
+
+public void filereceive() throws Exception{
+
+ServerSocket serverSocket = new ServerSocket(1234); 
+
+JOptionPane.showMessageDialog(null,"服务已启动,绑定1234端口!");
+
+while(true){
+
+Socket socket = serverSocket.accept();
+
+new fileServerThread(socket).start();
+
+}  
+
+} 
+
+} 
+
+class fileServerThread extends Thread{
+
+Socket socket;
+
+public fileServerThread(Socket socket) {
+
+this.socket = socket; 
+
+}
+
+public void run() { 
+
+FileOutputStream fos = null;
+
+try {
+
+BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream())); 
+
+PrintStream ps = new PrintStream(socket.getOutputStream());
+
+String fileName = br.readLine();
+
+long fileLen = Long.parseLong(br.readLine());
+
+File dir = new File("upload");
+
+dir.mkdir(); 
+
+File file = new File(dir,fileName); 
+
+if(file.exists() && file.length() == fileLen){
+
+ps.println("已存在");
+
+return; 
+
+}
+
+else{
+
+ps.println(file.length());
+
+} 
+
+String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+
+System.out.println(time + " "+ (file.exists() ? " 开始断点续传: " : " 开始上传文件: ") + file.getName()); 
+
+long start = System.currentTimeMillis();
+
+InputStream in = socket.getInputStream(); 
+
+fos = new FileOutputStream(file, true);
+
+byte[] buffer = new byte[1024];
+
+int len;
+
+while((len = in.read(buffer)) != -1){
+
+fos.write(buffer, 0, len); 
+
+if(file.length() == fileLen)
+
+break; 
+
+}  
+
+fos.close(); 
+
+long end = System.currentTimeMillis(); 
+
+time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+
+System.out.println(time + " " + " 上传文件结束: " + file.getName() + ", 耗时: " +  (end - start) + "毫秒");
+
+ps.println("上传成功");
+
+socket.close();
+
+} catch (IOException e) { 
+
+if(fos != null)
+
+try {
+
+fos.close();
+
+} catch (IOException e1) {
+
+e1.printStackTrace(); 
+
+} 
+
+} 
+
+} 
+
+} 
